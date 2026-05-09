@@ -14,6 +14,6 @@ public interface ProfileService {
     String updateProfile(MultipartFile file);
     ProfilePageDTO getProfileById(UUID id);
     void updateAvailability(Boolean available);
-    void updateSportsAndSkill(List<String> sports, String skillLevel, String description);
+    void updateSportsAndSkill(List<String> sports, String skillLevel, String description, String city);
     List<Profile> getAvailableProfilesBySport(String sport);
 }

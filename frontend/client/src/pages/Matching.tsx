@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { API_BASE_URL } from "../lib/apiConfig"
 import { getAuthToken } from "../lib/auth"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Crown, Zap } from "lucide-react"
+import { CheckCircle, Crown, Zap, MapPin, Calendar, X, Rocket } from "lucide-react"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
 
 interface Player {
   id: string
@@ -13,6 +15,7 @@ interface Player {
   avatarUrl?: string
   skillLevel?: string
   isCaptain: boolean
+  isConfirmed: boolean
 }
 
 interface MatchGroup {
@@ -20,6 +23,8 @@ interface MatchGroup {
   totalPlayers: number
   minRequired: number
   readyToPlay: boolean
+  confirmedCount: number
+  currentUserConfirmed: boolean
   captain: { id: string; username: string }
   players: Player[]
 }
@@ -36,10 +41,24 @@ const SPORT_COLORS: Record<string, string> = {
   Swimming: "#38bdf8", Badminton: "#34d399",
 }
 
-export default function Matching() {
+interface Props {
+  currentUserId: string
+}
+
+export default function Matching({ currentUserId }: Props) {
   const [groups, setGroups] = useState<MatchGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [confirming, setConfirming] = useState<string | null>(null)
+  const [confirmingPlayer, setConfirmingPlayer] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState<string | null>(null) // sport name
+  const [modalDateTime, setModalDateTime] = useState("")
+  const [modalLat, setModalLat] = useState<number | null>(null)
+  const [modalLng, setModalLng] = useState<number | null>(null)
+  const [modalLocation, setModalLocation] = useState("")
+  const [creatingEvent, setCreatingEvent] = useState(false)
+
+  const modalMapRef = useRef<L.Map | null>(null)
+  const modalMarkerRef = useRef<L.Marker | null>(null)
+
   const token = getAuthToken()
   const navigate = useNavigate()
 
@@ -56,20 +75,120 @@ export default function Matching() {
     fetchMatches()
   }, [])
 
-  async function handleConfirm(group: MatchGroup) {
-    setConfirming(group.sport)
-    const params = new URLSearchParams()
-    params.append("sport", group.sport)
-    group.players.forEach(p => params.append("playerIds", p.id))
-    params.append("captainId", group.captain.id)
-    const res = await fetch(`${API_BASE_URL}/matching/confirm?${params.toString()}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const data = await res.json()
-    setConfirming(null)
-    navigate(`/events/${data.eventId}`)
+  // Leaflet modal map lifecycle
+  useEffect(() => {
+    if (!showModal) {
+      if (modalMapRef.current) {
+        modalMapRef.current.remove()
+        modalMapRef.current = null
+        modalMarkerRef.current = null
+      }
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      if (modalMapRef.current) return
+      const map = L.map("modal-match-map").setView([45.7489, 21.2087], 12)
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: "&copy; OpenStreetMap &copy; CARTO",
+        maxZoom: 19,
+      }).addTo(map)
+
+      map.on("click", async (e) => {
+        const { lat, lng } = e.latlng
+        setModalLat(lat)
+        setModalLng(lng)
+
+        const color = SPORT_COLORS[showModal] || "#00e676"
+        const emoji = SPORT_EMOJIS[showModal] || "📍"
+        const icon = L.divIcon({
+          html: `<div style="width:36px;height:36px;background:${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 12px ${color}60;border:2px solid rgba(255,255,255,0.3)">${emoji}</div>`,
+          className: "",
+          iconSize: [36, 36],
+        })
+
+        if (modalMarkerRef.current) {
+          modalMarkerRef.current.setLatLng([lat, lng])
+          modalMarkerRef.current.setIcon(icon)
+        } else {
+          modalMarkerRef.current = L.marker([lat, lng], { icon }).addTo(map)
+        }
+
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+          )
+          const data = await res.json()
+          if (data.display_name) {
+            setModalLocation(data.display_name.split(",").slice(0, 2).join(","))
+          }
+        } catch { /* ignore */ }
+      })
+
+      modalMapRef.current = map
+    }, 150)
+
+    return () => clearTimeout(timeout)
+  }, [showModal])
+
+  async function handleConfirmPlayer(sport: string) {
+    setConfirmingPlayer(sport)
+    try {
+      await fetch(`${API_BASE_URL}/matching/confirm-player?sport=${encodeURIComponent(sport)}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      // Optimistic update
+      setGroups(prev => prev.map(g => {
+        if (g.sport !== sport) return g
+        return {
+          ...g,
+          currentUserConfirmed: true,
+          confirmedCount: g.confirmedCount + 1,
+          players: g.players.map(p =>
+            p.id === currentUserId ? { ...p, isConfirmed: true } : p
+          ),
+        }
+      }))
+    } finally {
+      setConfirmingPlayer(null)
+    }
   }
+
+  function openCaptainModal(sport: string) {
+    setModalDateTime("")
+    setModalLat(null)
+    setModalLng(null)
+    setModalLocation("")
+    setShowModal(sport)
+  }
+
+  async function handleCreateEvent(group: MatchGroup) {
+    if (!modalLat || !modalLng || !modalDateTime) return
+    setCreatingEvent(true)
+    try {
+      const params = new URLSearchParams()
+      params.append("sport", group.sport)
+      group.players.forEach(p => params.append("playerIds", p.id))
+      params.append("captainId", group.captain.id)
+      params.append("dateTime", new Date(modalDateTime).toISOString().slice(0, 19))
+      params.append("latitude", String(modalLat))
+      params.append("longitude", String(modalLng))
+      params.append("location", modalLocation || "TBD")
+
+      const res = await fetch(`${API_BASE_URL}/matching/confirm?${params.toString()}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      setShowModal(null)
+      navigate(`/events/${data.eventId}`)
+    } finally {
+      setCreatingEvent(false)
+    }
+  }
+
+  const activeGroup = groups.find(g => g.sport === showModal)
 
   return (
     <div className="max-w-xl mx-auto px-4">
@@ -80,7 +199,7 @@ export default function Matching() {
         </h1>
         <p className="text-field-muted text-sm mt-0.5 flex items-center gap-1.5">
           <Zap size={13} className="text-field-green" />
-          Matched by sport preferences
+          Stable groups — reshuffled daily
         </p>
       </div>
 
@@ -105,6 +224,9 @@ export default function Matching() {
           {groups.map((group, i) => {
             const color = SPORT_COLORS[group.sport] || "#00e676"
             const readiness = group.totalPlayers / group.minRequired
+            const isCaptain = group.captain.id === currentUserId
+            const canCreateEvent = isCaptain && group.confirmedCount >= 2
+
             return (
               <motion.div
                 key={group.sport}
@@ -128,7 +250,7 @@ export default function Matching() {
                         {group.sport.toUpperCase()}
                       </p>
                       <p className="text-xs text-field-muted">
-                        {group.totalPlayers}/{group.minRequired} min required
+                        {group.totalPlayers}/{group.minRequired} min · {group.confirmedCount} confirmed
                       </p>
                     </div>
                   </div>
@@ -179,43 +301,181 @@ export default function Matching() {
                             <p className="text-xs text-field-muted">{player.skillLevel}</p>
                           )}
                         </div>
-                        {player.isCaptain && (
-                          <Badge variant="amber">
-                            <Crown size={10} />
-                            Captain
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {player.isCaptain && (
+                            <Badge variant="amber">
+                              <Crown size={10} />
+                              Captain
+                            </Badge>
+                          )}
+                          {player.isConfirmed ? (
+                            <span className="text-field-green text-xs flex items-center gap-1">
+                              <CheckCircle size={13} />
+                              In
+                            </span>
+                          ) : (
+                            <span className="text-field-muted text-xs">Pending</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Confirm button */}
-                <div className="px-5 pb-5">
-                  <Button
-                    onClick={() => handleConfirm(group)}
-                    disabled={confirming === group.sport}
-                    size="lg"
-                    className="w-full font-bold"
-                  >
-                    {confirming === group.sport ? (
+                {/* Action buttons */}
+                <div className="px-5 pb-5 space-y-2">
+                  {/* "I'm In!" button — shown when not yet confirmed */}
+                  {!group.currentUserConfirmed ? (
+                    <Button
+                      onClick={() => handleConfirmPlayer(group.sport)}
+                      disabled={confirmingPlayer === group.sport}
+                      size="lg"
+                      variant="outline"
+                      className="w-full font-bold"
+                    >
+                      {confirmingPlayer === group.sport ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-field-green border-t-transparent rounded-full animate-spin" />
+                          Confirming...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <span>🙋</span>
+                          I&apos;m In!
+                        </span>
+                      )}
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold text-field-green border border-field-green/20 bg-field-green/5">
+                      <CheckCircle size={15} />
+                      You&apos;re in!
+                    </div>
+                  )}
+
+                  {/* Captain "Create Event" button */}
+                  {isCaptain && (
+                    <Button
+                      onClick={() => openCaptainModal(group.sport)}
+                      disabled={!canCreateEvent}
+                      size="lg"
+                      className="w-full font-bold"
+                      title={!canCreateEvent ? `Need at least 2 confirmations (${group.confirmedCount}/2)` : ""}
+                    >
                       <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-field-base border-t-transparent rounded-full animate-spin" />
-                        Creating event...
+                        <Rocket size={15} />
+                        {canCreateEvent
+                          ? "Create Event"
+                          : `Create Event (${group.confirmedCount}/2 confirmed)`}
                       </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <CheckCircle size={16} />
-                        Confirm & Create Event
-                      </span>
-                    )}
-                  </Button>
+                    </Button>
+                  )}
                 </div>
               </motion.div>
             )
           })}
         </div>
       )}
+
+      {/* Captain Create Event Modal */}
+      <AnimatePresence>
+        {showModal && activeGroup && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Backdrop */}
+            <motion.div
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+              onClick={() => !creatingEvent && setShowModal(null)}
+            />
+
+            {/* Modal */}
+            <motion.div
+              className="relative glass rounded-2xl w-full max-w-lg overflow-hidden"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              {/* Modal header */}
+              <div
+                className="px-5 py-4 flex items-center justify-between"
+                style={{
+                  background: `linear-gradient(135deg, ${SPORT_COLORS[showModal] || "#00e676"}20 0%, transparent 100%)`,
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{SPORT_EMOJIS[showModal] || "🏅"}</span>
+                  <div>
+                    <p className="font-display font-black text-lg tracking-wide text-field-text">
+                      CREATE EVENT
+                    </p>
+                    <p className="text-xs text-field-muted">{showModal} · {activeGroup.confirmedCount} confirmed players</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !creatingEvent && setShowModal(null)}
+                  className="text-field-muted hover:text-field-text transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* Date/Time picker */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-field-muted mb-2">
+                    <Calendar size={12} />
+                    Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={modalDateTime}
+                    onChange={e => setModalDateTime(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-field-text text-sm focus:outline-none focus:border-field-green/40 [color-scheme:dark]"
+                  />
+                </div>
+
+                {/* Map */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-field-muted mb-2">
+                    <MapPin size={12} />
+                    {modalLocation || "Click map to pick location"}
+                  </label>
+                  <div
+                    id="modal-match-map"
+                    className="w-full rounded-xl overflow-hidden border border-white/10"
+                    style={{ height: "220px" }}
+                  />
+                </div>
+
+                {/* Submit */}
+                <Button
+                  onClick={() => handleCreateEvent(activeGroup)}
+                  disabled={creatingEvent || !modalDateTime || !modalLat || !modalLng}
+                  size="lg"
+                  className="w-full font-bold"
+                >
+                  {creatingEvent ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-field-base border-t-transparent rounded-full animate-spin" />
+                      Creating event...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Rocket size={15} />
+                      Launch Event
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

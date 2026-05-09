@@ -59,4 +59,9 @@ public interface ProfileRepository extends JpaRepository<Profile, UUID> {
 
     @Query("SELECT COUNT(f) FROM Follow f WHERE CAST(f.followerId AS uuid) = :userId")
     long countFollowing(@Param("userId") UUID userId);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Profile p SET p.availableToday = false WHERE p.id IN :ids")
+    void setUnavailableForAll(@Param("ids") List<UUID> ids);
 }

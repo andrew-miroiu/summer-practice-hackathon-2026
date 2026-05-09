@@ -29,7 +29,7 @@ function AnimatedRoutes({ user, handleLogout }: { user: User; handleLogout: () =
           <Route path="/" element={<Feed />} />
           <Route path="/search" element={<Search currentUserId={user.id} />} />
           <Route path="/profile/:id" element={<Profile key={user.id} currentUser={user.id} />} />
-          <Route path="/matching" element={<Matching />} />
+          <Route path="/matching" element={<Matching currentUserId={user.id} />} />
           <Route path="/events/:id" element={<EventDetail currentUserId={user.id} />} />
           <Route path="/events/create" element={<CreateEvent />} />
           <Route path="/messages" element={<Messages currentUserId={user.id} />} />

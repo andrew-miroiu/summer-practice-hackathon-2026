@@ -64,7 +64,8 @@ public class ProfileServiceImpl implements ProfileService {
                 profile.getDescription(),
                 profile.getSkillLevel(),
                 profile.getAvailableToday(),
-                profile.getSportsPreferences()
+                profile.getSportsPreferences(),
+                profile.getCity()
         );
     }
 
@@ -125,13 +126,14 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public void updateSportsAndSkill(List<String> sports, String skillLevel, String description) {
+    public void updateSportsAndSkill(List<String> sports, String skillLevel, String description, String city) {
         CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         UUID userId = userDetails.getId();
         Profile profile = profileRepository.findProfileById(userId);
         profile.setSportsPreferences(sports);
         profile.setSkillLevel(skillLevel);
         profile.setDescription(description);
+        profile.setCity(city);
         profileRepository.save(profile);
     }
 

@@ -135,11 +135,8 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public Event createEventFromMatch(String sport, List<UUID> playerIds, UUID captainId) {
-        Event event = new Event();
-        event.setSport(sport);
-        event.setLocation("TBD");
-        event.setDateTime(LocalDateTime.now().plusHours(2));
+    public Event createEventFromMatch(String sport, List<UUID> playerIds, UUID captainId,
+                                      LocalDateTime dateTime, Double latitude, Double longitude, String location) {
         Map<String, Integer> sportMaxPlayers = Map.of(
                 "Football", 14,
                 "Basketball", 10,
@@ -150,8 +147,13 @@ public class EventServiceImpl implements EventService {
                 "Swimming", 8,
                 "Badminton", 4
         );
-        int maxPlayers = sportMaxPlayers.getOrDefault(sport, 10);
-        event.setMaxPlayers(maxPlayers);
+        Event event = new Event();
+        event.setSport(sport);
+        event.setLocation(location != null && !location.isBlank() ? location : "TBD");
+        event.setLatitude(latitude);
+        event.setLongitude(longitude);
+        event.setDateTime(dateTime != null ? dateTime : LocalDateTime.now().plusHours(2));
+        event.setMaxPlayers(sportMaxPlayers.getOrDefault(sport, 10));
         event.setCreatedBy(captainId);
         event.setCreatedAt(LocalDateTime.now());
         event.setIsCaptainAssigned(true);
@@ -162,6 +164,9 @@ public class EventServiceImpl implements EventService {
             EventMember member = new EventMember(saved.getId(), playerId, playerId.equals(captainId));
             eventMemberRepository.save(member);
         }
+
+        // Mark all matched players as unavailable for today
+        profileRepository.setUnavailableForAll(playerIds);
 
         return saved;
     }

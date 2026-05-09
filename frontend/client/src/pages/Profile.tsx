@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import ProfileSkeleton from "../components/skeletons/profileSkeleton"
 import {
   Camera, Edit3, Save, X, Sparkles, ChevronRight,
-  Users, FileText, UserCheck
+  Users, FileText, UserCheck, MapPin
 } from "lucide-react"
 
 interface LoadedUser {
@@ -22,6 +22,7 @@ interface LoadedUser {
   skillLevel?: string
   availableToday?: boolean
   sportsPreferences?: string[]
+  city?: string
 }
 
 interface ProfilePost {
@@ -60,6 +61,7 @@ export default function Profile({ currentUser }: { currentUser: string }) {
   const [availableToday, setAvailableToday] = useState(false)
   const [togglingAvailability, setTogglingAvailability] = useState(false)
   const [detectingSports, setDetectingSports] = useState(false)
+  const [city, setCity] = useState("")
 
   const { id } = useParams()
   const token = getAuthToken()
@@ -111,6 +113,7 @@ export default function Profile({ currentUser }: { currentUser: string }) {
       setSkillLevel(data.skillLevel || "")
       setDescription(data.description || "")
       setAvailableToday(data.availableToday || false)
+      setCity(data.city || "")
 
       const resPosts = await fetch(`${API_BASE_URL}/posts/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -155,6 +158,7 @@ console.log("Token pentru upload:", currentToken);
     selectedSports.forEach(s => params.append("sports", s))
     params.append("skillLevel", skillLevel)
     params.append("description", description)
+    params.append("city", city)
     await fetch(`${API_BASE_URL}/profiles/updateSportsAndSkill?${params.toString()}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
@@ -221,6 +225,12 @@ console.log("Token pentru upload:", currentToken);
           <h1 className="font-display font-black text-2xl tracking-wide text-field-text">
             {loadedUser.username || "No Username"}
           </h1>
+          {loadedUser.city && (
+            <p className="text-xs text-field-muted mt-0.5 flex items-center gap-1">
+              <MapPin size={11} />
+              {loadedUser.city}
+            </p>
+          )}
           {loadedUser.skillLevel && (
             <Badge
               variant={(SKILL_COLORS[loadedUser.skillLevel] as "muted" | "cyan" | "green") || "muted"}
@@ -397,6 +407,18 @@ console.log("Token pentru upload:", currentToken);
                       placeholder="Tell others about yourself..."
                       className="w-full glass rounded-xl p-3 text-sm text-field-text placeholder:text-field-muted outline-none focus:border-field-green/40 border border-white/[0.06] resize-none transition-all"
                       rows={3}
+                    />
+                  </div>
+
+                  {/* City */}
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-field-muted mb-2">City</p>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      placeholder="e.g. Timișoara"
+                      className="w-full glass rounded-xl px-3 py-2.5 text-sm text-field-text placeholder:text-field-muted outline-none focus:border-field-green/40 border border-white/[0.06] transition-all"
                     />
                   </div>
 

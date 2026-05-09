@@ -15,6 +15,7 @@ public interface EventService {
     void joinEvent(UUID eventId);
     EventMessage sendMessage(UUID eventId, String text);
     List<EventMessage> getMessages(UUID eventId);
-    Event createEventFromMatch(String sport, List<UUID> playerIds, UUID captainId);
+    Event createEventFromMatch(String sport, List<UUID> playerIds, UUID captainId,
+                               LocalDateTime dateTime, Double latitude, Double longitude, String location);
     List<Map<String, Object>> getEventsByDate(LocalDate date);
 }

@@ -6,4 +6,5 @@ public interface MatchingService {
     Map<String, Object> matchForSport(String sport);
     List<Map<String, Object>> matchAll();
     List<Map<String, Object>> matchForCurrentUser();
+    void confirmPlayer(String sport);
 }

@@ -48,8 +48,9 @@ public class ProfileController {
     public void updateSportsAndSkill(
             @RequestParam List<String> sports,
             @RequestParam String skillLevel,
-            @RequestParam String description){
-        profileService.updateSportsAndSkill(sports, skillLevel, description);
+            @RequestParam String description,
+            @RequestParam(defaultValue = "") String city){
+        profileService.updateSportsAndSkill(sports, skillLevel, description, city);
     }
 
     @GetMapping("/available")

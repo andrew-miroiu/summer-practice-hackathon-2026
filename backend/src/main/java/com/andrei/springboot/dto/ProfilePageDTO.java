@@ -14,11 +14,12 @@ public class ProfilePageDTO {
     private String skillLevel;
     private Boolean availableToday;
     private List<String> sportsPreferences;
+    private String city;
 
     public ProfilePageDTO(UUID id, String username, String avatarUrl, LocalDateTime createdAt,
                           String followersCount, String followingCount,
                           String description, String skillLevel, Boolean availableToday,
-                          List<String> sportsPreferences) {
+                          List<String> sportsPreferences, String city) {
         this.id = id;
         this.username = username;
         this.avatarUrl = avatarUrl;
@@ -29,6 +30,7 @@ public class ProfilePageDTO {
         this.skillLevel = skillLevel;
         this.availableToday = availableToday;
         this.sportsPreferences = sportsPreferences;
+        this.city = city;
     }
 
     public UUID getId() { return id; }
@@ -51,4 +53,6 @@ public class ProfilePageDTO {
     public void setAvailableToday(Boolean availableToday) { this.availableToday = availableToday; }
     public List<String> getSportsPreferences() { return sportsPreferences; }
     public void setSportsPreferences(List<String> sportsPreferences) { this.sportsPreferences = sportsPreferences; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
 }

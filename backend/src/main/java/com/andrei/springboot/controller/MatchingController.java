@@ -3,8 +3,10 @@ package com.andrei.springboot.controller;
 import com.andrei.springboot.model.Event;
 import com.andrei.springboot.service.EventService;
 import com.andrei.springboot.service.MatchingService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.UUID;
 
@@ -35,12 +37,22 @@ public class MatchingController {
         return matchingService.matchForCurrentUser();
     }
 
+    @PostMapping("/confirm-player")
+    public Map<String, Object> confirmPlayer(@RequestParam String sport) {
+        matchingService.confirmPlayer(sport);
+        return Map.of("status", "confirmed");
+    }
+
     @PostMapping("/confirm")
     public Map<String, Object> confirmMatch(
             @RequestParam String sport,
             @RequestParam List<UUID> playerIds,
-            @RequestParam UUID captainId) {
-        Event event = eventService.createEventFromMatch(sport, playerIds, captainId);
+            @RequestParam UUID captainId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTime,
+            @RequestParam Double latitude,
+            @RequestParam Double longitude,
+            @RequestParam(defaultValue = "TBD") String location) {
+        Event event = eventService.createEventFromMatch(sport, playerIds, captainId, dateTime, latitude, longitude, location);
         return Map.of("eventId", event.getId());
     }
 }

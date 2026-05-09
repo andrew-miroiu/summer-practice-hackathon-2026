@@ -32,6 +32,9 @@ public class Profile {
     @Column(name = "available_today")
     private Boolean availableToday = false;
 
+    @Column(name = "city")
+    private String city;
+
     @ElementCollection
     @CollectionTable(name = "profile_sports", joinColumns = @JoinColumn(name = "profile_id"))
     @Column(name = "sport")
@@ -69,4 +72,7 @@ public class Profile {
 
     public List<String> getSportsPreferences() { return sportsPreferences; }
     public void setSportsPreferences(List<String> sportsPreferences) { this.sportsPreferences = sportsPreferences; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
 }
