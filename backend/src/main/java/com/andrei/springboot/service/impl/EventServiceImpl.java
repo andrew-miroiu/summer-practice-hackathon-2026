@@ -140,7 +140,18 @@ public class EventServiceImpl implements EventService {
         event.setSport(sport);
         event.setLocation("TBD");
         event.setDateTime(LocalDateTime.now().plusHours(2));
-        event.setMaxPlayers(playerIds.size());
+        Map<String, Integer> sportMaxPlayers = Map.of(
+                "Football", 14,
+                "Basketball", 10,
+                "Tennis", 4,
+                "Volleyball", 12,
+                "Running", 10,
+                "Cycling", 10,
+                "Swimming", 8,
+                "Badminton", 4
+        );
+        int maxPlayers = sportMaxPlayers.getOrDefault(sport, 10);
+        event.setMaxPlayers(maxPlayers);
         event.setCreatedBy(captainId);
         event.setCreatedAt(LocalDateTime.now());
         event.setIsCaptainAssigned(true);

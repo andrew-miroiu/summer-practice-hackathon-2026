@@ -16,6 +16,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import org.imgscalr.Scalr;
@@ -52,12 +53,15 @@ public class SupabaseProfilePictureStorageImpl implements StorageService {
 
         BufferedImage originalImage = ImageIO.read(file.getInputStream());
 
+        if (originalImage == null) {
+            throw new IllegalArgumentException("Could not read image — unsupported format");
+        }
+
         int maxSize = 512;
 
         BufferedImage resizedImage;
 
         if (originalImage.getWidth() > maxSize || originalImage.getHeight() > maxSize) {
-
             resizedImage = Scalr.resize(
                     originalImage,
                     Scalr.Method.QUALITY,
@@ -65,16 +69,28 @@ public class SupabaseProfilePictureStorageImpl implements StorageService {
                     maxSize,
                     maxSize
             );
-
         } else {
             resizedImage = originalImage;
         }
 
+        // JPEG does not support alpha channel — convert to RGB if needed
+        if (resizedImage.getType() != BufferedImage.TYPE_INT_RGB) {
+            BufferedImage rgbImage = new BufferedImage(
+                    resizedImage.getWidth(), resizedImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = rgbImage.createGraphics();
+            g.drawImage(resizedImage, 0, 0, java.awt.Color.WHITE, null);
+            g.dispose();
+            resizedImage = rgbImage;
+        }
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(resizedImage, "webp", baos);
-        byte[] webpBytes = baos.toByteArray();
-        
-        String fileNmae = userId + "_" + System.currentTimeMillis() + ".webp";
+        boolean written = ImageIO.write(resizedImage, "jpeg", baos);
+        if (!written) {
+            throw new RuntimeException("Failed to encode image as JPEG");
+        }
+        byte[] imageBytes = baos.toByteArray();
+
+        String fileNmae = userId + "_" + System.currentTimeMillis() + ".jpg";
 
         HttpClient client = HttpClient.newHttpClient();
 
@@ -82,14 +98,15 @@ public class SupabaseProfilePictureStorageImpl implements StorageService {
                 .uri(URI.create(supabaseUrl + "/storage/v1/object/" + profilePicturesBucket + "/" + fileNmae))
                 .header("Authorization", "Bearer " + supabaseKey)
                 .header("apikey", supabaseKey)
-                .header("Content-Type", "image/webp")
-                .PUT(HttpRequest.BodyPublishers.ofByteArray(webpBytes))
+                .header("Content-Type", "image/jpeg")
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(imageBytes))
+                .header("x-upsert", "true")
                 .build();
-            
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if(response.statusCode() != 200 && response.statusCode() != 201) {
-            throw new RuntimeException("Upload failed: " + response.body());
+        HttpResponse<String> uploadResponse = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (uploadResponse.statusCode() != 200 && uploadResponse.statusCode() != 201) {
+            throw new RuntimeException("Upload failed: " + uploadResponse.body());
         }
 
         return supabaseUrl + "/storage/v1/object/public/" + profilePicturesBucket + "/" + fileNmae;

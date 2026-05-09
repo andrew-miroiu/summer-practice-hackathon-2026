@@ -89,7 +89,8 @@ public class ProfileServiceImpl implements ProfileService {
         if(file == null || file.isEmpty()){
             throw new IllegalArgumentException("File is required");
         }
-        if(!file.getContentType().startsWith("image/")){
+        String contentType = file.getContentType();
+        if(contentType == null || !contentType.startsWith("image/")){
             throw new IllegalArgumentException("File must be an image");
         }
 

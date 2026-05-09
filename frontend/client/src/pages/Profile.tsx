@@ -123,19 +123,31 @@ export default function Profile({ currentUser }: { currentUser: string }) {
   }, [id])
 
   async function handleAvatarSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (!avatarFile) return
-    setIsSubmitting(true)
-    const formData = new FormData()
-    formData.append("file", avatarFile)
-    await fetch(`${API_BASE_URL}/profiles/updateProfile`, {
+  e.preventDefault()
+  if (!avatarFile) return
+  setIsSubmitting(true)
+  const formData = new FormData()
+  formData.append("file", avatarFile)
+  try {
+const currentToken = getAuthToken();
+console.log("Token pentru upload:", currentToken);
+    const res = await fetch(`${API_BASE_URL}/profiles/updateProfile`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${currentToken}` },
       body: formData,
     })
+    if (!res.ok) {
+      const error = await res.json()
+      alert("Error: " + JSON.stringify(error))
+      return
+    }
     window.location.reload()
+  } catch (e) {
+    alert("Upload failed: " + e)
+  } finally {
     setIsSubmitting(false)
   }
+}
 
   async function handleSaveProfile() {
     setSavingProfile(true)

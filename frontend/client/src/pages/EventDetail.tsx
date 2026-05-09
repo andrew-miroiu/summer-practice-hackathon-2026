@@ -85,7 +85,13 @@ export default function EventDetail({ currentUserId }: { currentUserId: string }
         event: "INSERT", schema: "public", table: "event_messages",
         filter: `event_id=eq.${id}`,
       }, (payload) => {
-        const msg = payload.new as Message
+        const raw = payload.new
+        const msg: Message = {
+          id: raw.id as string,
+          profileId: raw.profile_id as string,
+          text: raw.text as string,
+          createdAt: raw.created_at as string,
+        }
         setMessages(prev => [...prev, msg])
         fetchProfileIfNeeded(msg.profileId)
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
