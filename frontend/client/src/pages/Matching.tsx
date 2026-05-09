@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../lib/apiConfig";
 import { getAuthToken } from "../lib/auth";
 import ClipLoader from "react-spinners/ClipLoader";
@@ -34,12 +35,29 @@ const SPORT_EMOJIS: Record<string, string> = {
 export default function Matching() {
   const [groups, setGroups] = useState<MatchGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const token = getAuthToken();
+  const navigate = useNavigate();
+
+  async function handleConfirm(group: MatchGroup) {
+    setConfirming(group.sport);
+    const params = new URLSearchParams();
+    params.append("sport", group.sport);
+    group.players.forEach((p) => params.append("playerIds", p.id));
+    params.append("captainId", group.captain.id);
+    const res = await fetch(`${API_BASE_URL}/matching/confirm?${params.toString()}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    setConfirming(null);
+    navigate(`/events/${data.eventId}`);
+  }
 
   useEffect(() => {
     async function fetchMatches() {
       setLoading(true);
-      const res = await fetch(`${API_BASE_URL}/matching/all`, {
+      const res = await fetch(`${API_BASE_URL}/matching/my`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -121,6 +139,16 @@ export default function Matching() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="px-4 pb-4">
+            <button
+              onClick={() => handleConfirm(group)}
+              disabled={confirming === group.sport}
+              className="w-full py-2.5 bg-green-500 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {confirming === group.sport ? "Loading..." : "✅ Confirm & Create Event"}
+            </button>
           </div>
         </div>
       ))}

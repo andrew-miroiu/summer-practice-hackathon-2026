@@ -2,10 +2,13 @@ package com.andrei.springboot.service.impl;
 
 import com.andrei.springboot.model.Profile;
 import com.andrei.springboot.repository.ProfileRepository;
+import com.andrei.springboot.security.CustomUserDetails;
 import com.andrei.springboot.service.MatchingService;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.UUID;
 
 @Service
 public class MatchingServiceImpl implements MatchingService {
@@ -61,6 +64,23 @@ public class MatchingServiceImpl implements MatchingService {
             "players", players,
             "readyToPlay", group.size() >= range[0]
         );
+    }
+
+    @Override
+    public List<Map<String, Object>> matchForCurrentUser() {
+        CustomUserDetails userDetails = (CustomUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UUID userId = userDetails.getId();
+        Profile profile = profileRepository.findProfileById(userId);
+        List<String> userSports = profile.getSportsPreferences();
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (String sport : userSports) {
+            Map<String, Object> match = matchForSport(sport);
+            List<?> players = (List<?>) match.get("players");
+            if (!players.isEmpty()) {
+                results.add(match);
+            }
+        }
+        return results;
     }
 
     @Override
