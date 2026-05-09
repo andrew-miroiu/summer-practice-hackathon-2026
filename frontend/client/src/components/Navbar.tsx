@@ -1,10 +1,11 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { Home, Search, User, Zap, MessageSquare, Plus, Menu, X, LogOut } from "lucide-react"
+import { Home, Search, User, Zap, MessageSquare, Plus, Menu, X, LogOut, Newspaper } from "lucide-react"
 
 const NAV_ITEMS = [
-  { to: "/", label: "Feed", icon: Home },
+  { to: "/", label: "Events 🏅", icon: Home },
+  { to: "/feed/social", label: "Social 📱", icon: Newspaper },
   { to: "/matching", label: "Match", icon: Zap },
   { to: "/messages", label: "Messages", icon: MessageSquare },
   { to: "/search", label: "Search", icon: Search },

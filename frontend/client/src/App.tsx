@@ -11,6 +11,8 @@ import Matching from "./pages/Matching"
 import EventDetail from "./pages/EventDetail"
 import CreateEvent from "./pages/CreateEvent"
 import Messages from "./pages/Messages"
+import SocialFeed from "./pages/SocialFeed"
+import PostDetail from "./pages/PostDetail"
 import type { User } from "@supabase/supabase-js"
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"
 
@@ -33,6 +35,8 @@ function AnimatedRoutes({ user, handleLogout }: { user: User; handleLogout: () =
           <Route path="/events/:id" element={<EventDetail currentUserId={user.id} />} />
           <Route path="/events/create" element={<CreateEvent />} />
           <Route path="/messages" element={<Messages currentUserId={user.id} />} />
+          <Route path="/feed/social" element={<SocialFeed currentUserId={user.id} />} />
+          <Route path="/post/:id" element={<PostDetail currentUserId={user.id} />} />
           <Route path="/logout" element={<LogoutRedirect handleLogout={handleLogout} />} />
         </Routes>
       </motion.div>
