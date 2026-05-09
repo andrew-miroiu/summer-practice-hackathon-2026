@@ -1,123 +1,154 @@
 import { useState } from "react"
+import { motion } from "framer-motion"
 import { supabase } from "../lib/supabaseClient"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Mail, Lock, User } from "lucide-react"
 
 export default function Signup({ setLogin }: { setLogin: React.Dispatch<React.SetStateAction<boolean>> }) {
-
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [full_name, setFullName] = useState("")
+  const [fullName, setFullName] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
-
-    const { data, error } = await supabase.auth.signUp({
+    setLoading(true)
+    const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          full_name: full_name,
-          username: full_name
-        }
-      }
+      options: { data: { full_name: fullName, username: fullName } },
     })
-
-    if (error) {
-      console.error("Signup error:", error)
-    }
-
-    console.log("Signup response:", data)
-    setLogin(true)
+    if (!error) setSuccess(true)
+    setLoading(false)
   }
 
   async function handleGoogleLogin() {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin }
+      options: { redirectTo: window.location.origin },
     })
+  }
 
-    if (error) {
-      console.error("Google login error:", error)
-    }
-
-    console.log("Google login data:", data)
+  if (success) {
+    return (
+      <div className="min-h-screen bg-field-base flex items-center justify-center px-4">
+        <motion.div
+          className="glass rounded-2xl p-10 text-center max-w-sm w-full"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <div className="text-5xl mb-4 animate-float">✅</div>
+          <h2 className="font-display font-black text-3xl text-field-green tracking-wider mb-2">YOU'RE IN</h2>
+          <p className="text-field-muted text-sm mb-6">Check your email to verify your account.</p>
+          <Button onClick={() => setLogin(true)} variant="outline" className="w-full">Back to Login</Button>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
-    <div className="signup-container min-h-screen flex items-center justify-center bg-slate-400 px-4">
+    <div className="min-h-screen bg-field-base flex items-center justify-center relative overflow-hidden px-4">
+      <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-field-cyan/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-field-green/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="signup-card w-full max-w-md bg-white rounded-2xl shadow-lg p-6 sm:p-8 space-y-6">
-
-        {/* Title */}
-        <div className="signup-header space-y-2 text-center">
-          <h1 className="signup-title text-2xl sm: text-3xl font-bold text-slate-900">Create Account</h1>
-          <p className="signup-subtitle text-sm text-slate-500">Join us and start connecting!</p>
+      <motion.div
+        className="w-full max-w-md relative z-10"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div className="text-center mb-8">
+          <h1 className="font-display font-black text-6xl tracking-widest text-field-text">
+            JOIN<span className="text-field-cyan">UP</span>
+          </h1>
+          <p className="text-field-muted text-sm mt-2 font-medium tracking-wider uppercase">
+            Create your account
+          </p>
         </div>
 
-        {/* Signup Form */}
-        <form onSubmit={handleSignup} className="signup-form space-y-4">
-
-          {/* Username */}
-          <div className="signup-field space-y-2">
-            <label className="signup-label block text-sm font-medium text-slate-700">Username</label>
-            <input
+        <div className="glass rounded-2xl p-8 space-y-5">
+          <form onSubmit={handleSignup} className="space-y-4">
+            <Input
+              label="Username"
+              id="username"
               type="text"
               placeholder="Your username"
-              value={full_name}
-              onChange={(e) => setFullName(e.target.value)}
-              className="signup-input w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:text-base outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              icon={<User size={15} />}
               required
             />
-          </div>
-
-          {/* Email */}
-          <div className="signup-field space-y-2">
-            <label className="signup-label block text-sm font-medium text-slate-700">Email</label>
-            <input
+            <Input
+              label="Email"
+              id="email"
               type="email"
-              placeholder="Email address"
+              placeholder="your@email.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="signup-input w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:text-base outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50"
+              onChange={e => setEmail(e.target.value)}
+              icon={<Mail size={15} />}
               required
             />
-          </div>
-
-          {/* Password */}
-          <div className="signup-field space-y-2">
-            <label className="signup-label block text-sm font-medium text-slate-700">Password</label>
-            <input
+            <Input
+              label="Password"
+              id="password"
               type="password"
-              placeholder="Password"
+              placeholder="Min. 6 characters"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="signup-input w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:text-base outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50"
+              onChange={e => setPassword(e.target.value)}
+              icon={<Lock size={15} />}
               required
             />
+
+            <Button
+              type="submit"
+              disabled={loading}
+              size="lg"
+              className="w-full font-bold text-base"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-field-base border-t-transparent rounded-full animate-spin" />
+                  Creating account...
+                </span>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
+          </form>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/[0.06]" />
+            <span className="text-xs text-field-muted uppercase tracking-widest">or</span>
+            <div className="flex-1 h-px bg-white/[0.06]" />
           </div>
 
-          <button type="submit" className="signup-button w-full rounded-lg bg-indigo-600 text-white py-2.5 text-sm sm:text-base font-semibold hover:bg-indigo-700 transition-colors">
-            Sign up
-          </button>
-        </form>
-
-        {/* Divider */}
-        <div className="signup-divider flex items-center gap-3">
-          <div className="signup-line h-px flex-1 bg-slate-200"/>
-          <span className="signup-or text-xs text-slate-400">OR</span>
-          <div className="signup-line h-px flex-1 bg-slate-200" />
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={handleGoogleLogin}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            Sign up with Google
+          </Button>
         </div>
 
-        {/* Google Login */}
-        <button onClick={handleGoogleLogin} className="signup-google-button w-full flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white py-2.5 text-sm sm:text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-          Sign up with Google
+        <button
+          onClick={() => setLogin(true)}
+          className="w-full text-center mt-6 text-sm text-field-muted hover:text-field-green transition-colors"
+        >
+          Already have an account?{" "}
+          <span className="text-field-green font-semibold">Sign in</span>
         </button>
-
-        {/* Already have an account */}
-        <button onClick={() => setLogin(true)} className="signup-switch w-full text-center text-sm text-slate-600 hover:text-indigo-600 transition-colors">
-          Already have an account? <span className="signup-switch-link font-semibold">Log in here.</span>
-        </button>
-
-      </div>
+      </motion.div>
     </div>
   )
 }

@@ -1,46 +1,44 @@
-import  { useState } from "react";
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import MessagesUsers from "../components/MessagesUsers"
 import Chat from "../components/Chat"
+import { MessageSquare, ArrowLeft } from "lucide-react"
 
-export default function Messages({ currentUserId } : { currentUserId: string;}) {
-  const [conversation, setConversation] = useState<string>("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [chatHeaderUser, setChatHeaderUser] = useState<string>("");
-  
+export default function Messages({ currentUserId }: { currentUserId: string }) {
+  const [conversation, setConversation] = useState<string>("")
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [chatHeaderUser, setChatHeaderUser] = useState<string>("")
+
   return (
-    <div className="flex h-[calc(100vh-73px)] bg-white">
-      {/* MOBILE OVERLAY */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
+    <div className="flex h-[calc(100vh-73px)] overflow-hidden">
+      {/* Mobile overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* LEFT SIDEBAR — USERS */}
+      {/* Sidebar */}
       <aside className={`
-        fixed md:relative inset-y-0 left-0 z-50 w-64 md:w-80 lg:w-72 bg-white border-r border-slate-200 overflow-hidden flex flex-col transform transition-transform duration-300 ease-in-out
+        fixed md:relative inset-y-0 left-0 z-50 w-72 flex flex-col
+        glass border-r border-white/[0.06] transform transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
-        {/* Mobile Close Button */}
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Messages</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <h2 className="font-display font-black text-xl tracking-wide text-field-text">MESSAGES</h2>
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600"
+            className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg text-field-muted hover:text-field-text hover:bg-white/5 transition-all"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <ArrowLeft size={16} />
           </button>
         </div>
-
-        {/* Desktop Header - Hidden on mobile */}
-        <div className="hidden md:block p-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Messages</h2>
-        </div>
-
-        {/* Users List - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           <MessagesUsers
             currentUserId={currentUserId}
@@ -51,23 +49,22 @@ export default function Messages({ currentUserId } : { currentUserId: string;}) 
         </div>
       </aside>
 
-      {/* RIGHT — CHAT SECTION */}
+      {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile Header with Burger */}
-        <div className="md:hidden flex items-center gap-3 p-4 border-b border-slate-200 bg-white">
+        {/* Mobile header */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-field-surface/50">
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 hover:bg-slate-100 rounded-lg transition text-slate-600"
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-field-muted hover:text-field-text hover:bg-white/5 transition-all"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <MessageSquare size={16} />
           </button>
-          <h1 className="text-lg font-semibold text-slate-900">Chat - {chatHeaderUser}</h1>
+          <span className="font-semibold text-field-text text-sm">
+            {chatHeaderUser || "Select a conversation"}
+          </span>
         </div>
 
-        {/* Chat Component - Takes remaining space */}
-        <div className="flex-1 overflow-hidden bg-white">
+        <div className="flex-1 overflow-hidden">
           <Chat currentUserId={currentUserId} conversation_id={conversation} />
         </div>
       </div>

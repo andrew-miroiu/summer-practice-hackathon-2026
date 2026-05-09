@@ -1,155 +1,138 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../lib/apiConfig";
-import { getAuthToken } from "../lib/auth";
-import { supabase } from "../lib/supabaseClient";
-import ClipLoader from "react-spinners/ClipLoader";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useRef, useState } from "react"
+import { useParams, useNavigate } from "react-router-dom"
+import { motion } from "framer-motion"
+import { API_BASE_URL } from "../lib/apiConfig"
+import { getAuthToken } from "../lib/auth"
+import { supabase } from "../lib/supabaseClient"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+import { MapPin, Clock, Users, Crown, Send, MessageSquare, MapIcon } from "lucide-react"
 
 const SPORT_EMOJIS: Record<string, string> = {
   Football: "⚽", Basketball: "🏀", Tennis: "🎾",
   Volleyball: "🏐", Running: "🏃", Cycling: "🚴",
   Swimming: "🏊", Badminton: "🏸",
-};
-
-interface Member {
-  id: string;
-  username: string;
-  avatarUrl?: string;
-  isCaptain: boolean;
 }
+
+const SPORT_COLORS: Record<string, string> = {
+  Football: "#4ade80", Basketball: "#fb923c", Tennis: "#facc15",
+  Volleyball: "#60a5fa", Running: "#f87171", Cycling: "#a78bfa",
+  Swimming: "#38bdf8", Badminton: "#34d399",
+}
+
+interface Member { id: string; username: string; avatarUrl?: string; isCaptain: boolean }
 
 interface EventData {
-  id: string;
-  sport: string;
-  location: string;
-  latitude?: number;
-  longitude?: number;
-  dateTime: string;
-  maxPlayers: number;
-  currentPlayers: number;
-  createdBy: string;
-  members: Member[];
+  id: string; sport: string; location: string; latitude?: number; longitude?: number
+  dateTime: string; maxPlayers: number; currentPlayers: number; createdBy: string; members: Member[]
 }
 
-interface Message {
-  id: string;
-  profileId: string;  // era profile_id
-  text: string;
-  createdAt: string;  // era created_at
-}
+interface Message { id: string; profileId: string; text: string; createdAt: string }
 
-interface Venue {
-  name: string;
-  address: string;
-  description: string;
-}
+interface Venue { name: string; address: string; description: string }
 
-interface ProfileCache {
-  username: string;
-  avatarUrl?: string;
-}
+interface ProfileCache { username: string; avatarUrl?: string }
 
 export default function EventDetail({ currentUserId }: { currentUserId: string }) {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const token = getAuthToken();
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const token = getAuthToken()
 
-  const [event, setEvent] = useState<EventData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const [venues, setVenues] = useState<Venue[]>([]);
-  const [profilesCache, setProfilesCache] = useState<Record<string, ProfileCache>>({});
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const fetchingProfiles = useRef<Set<string>>(new Set());
+  const [event, setEvent] = useState<EventData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [joining, setJoining] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState("")
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [venues, setVenues] = useState<Venue[]>([])
+  const [profilesCache, setProfilesCache] = useState<Record<string, ProfileCache>>({})
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const fetchingProfiles = useRef<Set<string>>(new Set())
 
-  const isMember = event?.members.some(m => m.id === currentUserId);
-  const isCaptain = event?.members.some(m => m.id === currentUserId && m.isCaptain);
+  const isMember = event?.members.some(m => m.id === currentUserId)
+  const isCaptain = event?.members.some(m => m.id === currentUserId && m.isCaptain)
 
   async function fetchProfileIfNeeded(profileId: string) {
-  if (fetchingProfiles.current.has(profileId)) return;
-  fetchingProfiles.current.add(profileId);
-  try {
-    const res = await fetch(`${API_BASE_URL}/profiles/${profileId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    console.log("Fetched profile for", profileId, data);
-    setProfilesCache(prev => ({
-      ...prev,
-      [profileId]: { username: data.username || "Unknown", avatarUrl: data.avatarUrl }
-    }));
-  } catch {}
-}
+    if (fetchingProfiles.current.has(profileId)) return
+    fetchingProfiles.current.add(profileId)
+    try {
+      const res = await fetch(`${API_BASE_URL}/profiles/${profileId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      setProfilesCache(prev => ({
+        ...prev,
+        [profileId]: { username: data.username || "Unknown", avatarUrl: data.avatarUrl }
+      }))
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
-  if (!event || messages.length === 0) return;
-  messages.forEach(msg => fetchProfileIfNeeded(msg.profileId));
-}, [event, messages]);
+    if (!event || messages.length === 0) return
+    messages.forEach(msg => fetchProfileIfNeeded(msg.profileId))
+  }, [event, messages])
 
   useEffect(() => {
-    fetchEvent();
-    fetchMessages();
+    fetchEvent()
+    fetchMessages()
 
     const channel = supabase
       .channel(`event-${id}`)
       .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "event_messages",
+        event: "INSERT", schema: "public", table: "event_messages",
         filter: `event_id=eq.${id}`,
       }, (payload) => {
-        const msg = payload.new as Message;
-        setMessages(prev => [...prev, msg]);
-        fetchProfileIfNeeded(msg.profileId);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        const msg = payload.new as Message
+        setMessages(prev => [...prev, msg])
+        fetchProfileIfNeeded(msg.profileId)
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
       })
-      .subscribe();
+      .subscribe()
 
-    return () => { supabase.removeChannel(channel); };
-  }, [id]);
+    return () => { supabase.removeChannel(channel) }
+  }, [id])
 
   useEffect(() => {
-    if (!event?.latitude || !event?.longitude) return;
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
+    if (!event?.latitude || !event?.longitude) return
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
 
-    const map = L.map("event-detail-map").setView([event.latitude, event.longitude], 15);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
-    L.marker([event.latitude, event.longitude]).addTo(map);
-    mapRef.current = map;
+    const map = L.map("event-detail-map").setView([event.latitude, event.longitude], 15)
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "&copy; OpenStreetMap &copy; CARTO", maxZoom: 19,
+    }).addTo(map)
 
-    fetchNearbyVenues(event.sport);
-  }, [event]);
+    const color = SPORT_COLORS[event.sport] || "#00e676"
+    const icon = L.divIcon({
+      html: `<div style="width:40px;height:40px;background:${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 16px ${color}80;border:3px solid rgba(255,255,255,0.3)">${SPORT_EMOJIS[event.sport] || "🏅"}</div>`,
+      className: "", iconSize: [40, 40],
+    })
+    L.marker([event.latitude, event.longitude], { icon }).addTo(map)
+    mapRef.current = map
+
+    fetchNearbyVenues(event.sport)
+  }, [event])
 
   async function fetchEvent() {
-    setLoading(true);
+    setLoading(true)
     const res = await fetch(`${API_BASE_URL}/events/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    setEvent(data);
-    setLoading(false);
+    })
+    const data = await res.json()
+    setEvent(data)
+    setLoading(false)
   }
 
   async function fetchMessages() {
     const res = await fetch(`${API_BASE_URL}/events/${id}/messages`, {
       headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-     console.log("First message:", data[0]);
-    setMessages(data);
-    data.forEach((msg: Message) => fetchProfileIfNeeded(msg.profileId));
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    })
+    const data = await res.json()
+    setMessages(data)
+    data.forEach((msg: Message) => fetchProfileIfNeeded(msg.profileId))
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100)
   }
 
   function fetchNearbyVenues(sport: string) {
@@ -157,217 +140,283 @@ export default function EventDetail({ currentUserId }: { currentUserId: string }
       Football: [
         { name: "Stadionul Dan Păltinișanu", address: "Str. Vasile Pârvan, Timișoara", description: "Principalul stadion de fotbal din Timișoara" },
         { name: "Baza Sportivă Olimpia", address: "Calea Bogdăneștilor, Timișoara", description: "Complex sportiv cu terenuri de fotbal" },
-        { name: "Stadionul CFR", address: "Calea Dorobanților, Timișoara", description: "Teren de fotbal în centrul orașului" },
       ],
       Basketball: [
         { name: "Sala Olimpia", address: "Str. Vasile Pârvan 1, Timișoara", description: "Principala sală de baschet din Timișoara" },
         { name: "Universitatea de Vest - Sala Sport", address: "Bd. Vasile Pârvan 4, Timișoara", description: "Sală universitară cu teren de baschet" },
-        { name: "Complexul Sportiv Municipal", address: "Aleea Sporturilor 1, Timișoara", description: "Complex cu terenuri de baschet acoperite" },
       ],
       Tennis: [
         { name: "Tenis Club Politehnica", address: "Bd. Vasile Pârvan, Timișoara", description: "Club de tenis cu terenuri exterioare și acoperite" },
-        { name: "Strandul Tineretului - Tenis", address: "Aleea Pădurii, Timișoara", description: "Terenuri de tenis lângă strand" },
         { name: "ILSA Tennis Club", address: "Calea Șagului, Timișoara", description: "Club privat de tenis cu instructori" },
       ],
       Volleyball: [
         { name: "Sala Olimpia", address: "Str. Vasile Pârvan 1, Timișoara", description: "Sală polivalentă cu teren de volei" },
-        { name: "Liceul Sportiv Banatul", address: "Str. Gheorghe Lazăr, Timișoara", description: "Sală cu terenuri de volei" },
         { name: "Complexul Sportiv Municipal", address: "Aleea Sporturilor 1, Timișoara", description: "Terenuri de volei în aer liber" },
       ],
       Running: [
         { name: "Parcul Rozelor", address: "Aleea Rozelor, Timișoara", description: "Traseu de alergare de 3km în parc" },
-        { name: "Parcul Central", address: "Bd. Regele Ferdinand, Timișoara", description: "Traseu popular pentru alergători" },
         { name: "Pădurea Verde", address: "Calea Dorobanților, Timișoara", description: "Trasee naturale de alergare în pădure" },
       ],
       Cycling: [
         { name: "Pista de Ciclism Timișoara", address: "Aleea Sporturilor, Timișoara", description: "Pistă dedicată ciclismului" },
         { name: "Parcul Rozelor - Pista Biciclete", address: "Aleea Rozelor, Timișoara", description: "Traseu pentru biciclete în parc" },
-        { name: "Calea Torontalului - Pistă", address: "Calea Torontalului, Timișoara", description: "Pistă de biciclete pe calea principală" },
       ],
       Swimming: [
         { name: "Strandul Tineretului", address: "Aleea Pădurii, Timișoara", description: "Complex acvatic cu bazine olimpice" },
-        { name: "Aquapark Timișoara", address: "Calea Torontalului, Timișoara", description: "Parc acvatic cu bazine de înot" },
         { name: "Bazin Olimpic UVT", address: "Bd. Vasile Pârvan 4, Timișoara", description: "Bazin olimpic universitar" },
       ],
       Badminton: [
         { name: "Sala Polivalentă Timișoara", address: "Str. Vasile Pârvan, Timișoara", description: "Sală cu terenuri de badminton" },
         { name: "Badminton Club Timișoara", address: "Calea Șagului, Timișoara", description: "Club dedicat badmintonului" },
-        { name: "SportPark Timișoara", address: "Calea Bogdăneștilor, Timișoara", description: "Complex sportiv indoor cu badminton" },
       ],
-    };
-    setVenues(venuesBySport[sport] || venuesBySport["Football"]);
+    }
+    setVenues(venuesBySport[sport] || venuesBySport["Football"])
   }
 
   async function handleJoin() {
-    setJoining(true);
+    setJoining(true)
     await fetch(`${API_BASE_URL}/events/${id}/join`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setJoining(false);
-    fetchEvent();
+      method: "POST", headers: { Authorization: `Bearer ${token}` },
+    })
+    setJoining(false)
+    fetchEvent()
   }
 
   async function handleSendMessage() {
-    if (!newMessage.trim()) return;
-    setSendingMessage(true);
+    if (!newMessage.trim()) return
+    setSendingMessage(true)
     await fetch(`${API_BASE_URL}/events/${id}/messages?text=${encodeURIComponent(newMessage)}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setNewMessage("");
-    setSendingMessage(false);
+      method: "POST", headers: { Authorization: `Bearer ${token}` },
+    })
+    setNewMessage("")
+    setSendingMessage(false)
   }
 
   if (loading || !event) {
-    return <div className="flex justify-center items-center h-64"><ClipLoader size={32} color="#4f46e5" /></div>;
+    return (
+      <div className="max-w-xl mx-auto px-4 space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="glass rounded-2xl h-32 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+        ))}
+      </div>
+    )
   }
 
-  return (
-    <div className="max-w-xl mx-auto p-4 space-y-4">
+  const color = SPORT_COLORS[event.sport] || "#00e676"
+  const fill = event.currentPlayers / event.maxPlayers
 
-      {/* HEADER */}
-      <div className="bg-white rounded-2xl shadow-md p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-4xl">{SPORT_EMOJIS[event.sport] || "🏅"}</span>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">{event.sport}</h1>
-            <p className="text-sm text-slate-500">{event.location}</p>
-            <p className="text-sm text-slate-500">
-              {new Date(event.dateTime).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}
-            </p>
+  return (
+    <div className="max-w-xl mx-auto px-4 space-y-4">
+      {/* Header */}
+      <motion.div
+        className="glass rounded-2xl overflow-hidden"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div
+          className="px-5 py-6"
+          style={{ background: `linear-gradient(135deg, ${color}20 0%, transparent 100%)`, borderBottom: `1px solid ${color}20` }}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className="h-16 w-16 rounded-2xl flex items-center justify-center text-4xl flex-shrink-0"
+              style={{ background: `${color}18`, border: `1px solid ${color}30` }}
+            >
+              {SPORT_EMOJIS[event.sport] || "🏅"}
+            </div>
+            <div className="flex-1">
+              <h1 className="font-display font-black text-3xl tracking-wide text-field-text">
+                {event.sport.toUpperCase()}
+              </h1>
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="flex items-center gap-1.5 text-xs text-field-muted">
+                  <MapPin size={11} /> {event.location}
+                </span>
+                <span className="flex items-center gap-1.5 text-xs text-field-muted">
+                  <Clock size={11} />
+                  {new Date(event.dateTime).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mt-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Users size={12} className="text-field-muted" />
+                <span className="text-xs text-field-muted">
+                  <span className="font-bold text-field-text">{event.currentPlayers}</span>/{event.maxPlayers} players
+                </span>
+                {fill >= 1 && <Badge variant="red">Full</Badge>}
+              </div>
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: color }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(fill * 100, 100)}%` }}
+                  transition={{ delay: 0.3, duration: 0.6 }}
+                />
+              </div>
+            </div>
+            {!isMember && (
+              <Button onClick={handleJoin} disabled={joining} size="default">
+                {joining ? (
+                  <span className="w-4 h-4 border-2 border-field-base border-t-transparent rounded-full animate-spin" />
+                ) : "Join Event"}
+              </Button>
+            )}
+            {isCaptain && (
+              <Badge variant="amber"><Crown size={11} /> Captain</Badge>
+            )}
           </div>
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-600">
-            <span className="font-semibold text-indigo-600">{event.currentPlayers}</span>/{event.maxPlayers} players
-          </p>
-          {!isMember && (
-            <button
-              onClick={handleJoin}
-              disabled={joining}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl font-semibold disabled:opacity-50"
-            >
-              {joining ? <ClipLoader size={14} color="#fff" /> : "Join Event"}
-            </button>
-          )}
-          {isCaptain && (
-            <span className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-semibold">
-              👑 You're the captain
-            </span>
-          )}
-        </div>
-      </div>
+      </motion.div>
 
-      {/* MAPA */}
+      {/* Map */}
       {event.latitude && event.longitude && (
-        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
-          <div id="event-detail-map" style={{ height: "220px" }} />
-        </div>
+        <motion.div
+          className="glass rounded-2xl overflow-hidden"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
+            <MapIcon size={14} className="text-field-muted" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-field-muted">Location</span>
+          </div>
+          <div id="event-detail-map" style={{ height: 220 }} />
+        </motion.div>
       )}
 
-      {/* VENUE SUGGESTIONS */}
+      {/* Venue suggestions */}
       {venues.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-md p-4">
-          <p className="text-sm font-semibold text-slate-700 mb-3">📍 Nearby Venues in Timișoara</p>
+        <motion.div
+          className="glass rounded-2xl p-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest text-field-muted mb-3">
+            Nearby Venues in Timișoara
+          </p>
           <div className="space-y-2">
             {venues.map((venue, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
-                <span className="text-2xl">🏟️</span>
+              <div key={i} className="flex gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+                <span className="text-xl">🏟️</span>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">{venue.name}</p>
-                  <p className="text-xs text-slate-500">{venue.address}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{venue.description}</p>
+                  <p className="text-sm font-semibold text-field-text">{venue.name}</p>
+                  <p className="text-xs text-field-muted">{venue.address}</p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* MEMBRI */}
-      <div className="bg-white rounded-2xl shadow-md p-4">
-        <p className="text-sm font-semibold text-slate-700 mb-3">Players ({event.currentPlayers})</p>
+      {/* Members */}
+      <motion.div
+        className="glass rounded-2xl p-5"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-field-muted mb-3">
+          Players ({event.currentPlayers})
+        </p>
         <div className="space-y-2">
           {event.members.map(member => (
             <div
               key={member.id}
               onClick={() => navigate(`/profile/${member.id}`)}
-              className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 rounded-xl p-1"
+              className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.03] cursor-pointer transition-all group"
             >
-              <div className="h-9 w-9 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
+              <div
+                className="h-9 w-9 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-sm"
+                style={{ background: `${color}18`, border: `1px solid ${color}20`, color }}
+              >
                 {member.avatarUrl ? (
                   <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-                    {member.username[0]}
-                  </div>
-                )}
+                ) : member.username[0]}
               </div>
-              <p className="flex-1 text-sm font-medium text-slate-800">{member.username}</p>
-              {member.isCaptain && (
-                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">👑 Captain</span>
-              )}
+              <p className="flex-1 text-sm font-medium text-field-text group-hover:text-field-green transition-colors">
+                {member.username}
+              </p>
+              {member.isCaptain && <Badge variant="amber"><Crown size={10} /> Captain</Badge>}
             </div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      {/* CHAT */}
+      {/* Chat */}
       {isMember && (
-        <div className="bg-white rounded-2xl shadow-md p-4">
-          <p className="text-sm font-semibold text-slate-700 mb-3">Group Chat 💬</p>
-          <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
+        <motion.div
+          className="glass rounded-2xl overflow-hidden"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-white/[0.06]">
+            <MessageSquare size={14} className="text-field-muted" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-field-muted">Group Chat</span>
+          </div>
+
+          <div className="space-y-3 max-h-72 overflow-y-auto p-4">
             {messages.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-4">No messages yet. Say hi!</p>
+              <p className="text-xs text-field-muted text-center py-6">No messages yet. Say hi!</p>
             )}
             {messages.map((msg, i) => {
-              const profile = profilesCache[msg.profileId];
-              const isOwn = msg.profileId === currentUserId;
+              const profile = profilesCache[msg.profileId]
+              const isOwn = msg.profileId === currentUserId
               return (
                 <div key={i} className={`flex gap-2 items-end ${isOwn ? "flex-row-reverse" : ""}`}>
-                  <div className="h-7 w-7 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-                    {profile?.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                        {profile?.username?.[0]?.toUpperCase() || "?"}
-                      </div>
-                    )}
+                  <div
+                    className="h-7 w-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                    style={{ background: `${color}20`, color }}
+                  >
+                    {profile?.avatarUrl
+                      ? <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      : profile?.username?.[0]?.toUpperCase() || "?"}
                   </div>
-                  <div className={`flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
-                    <p className="text-xs text-slate-400 mb-0.5">
+                  <div className={`flex flex-col gap-0.5 max-w-[70%] ${isOwn ? "items-end" : "items-start"}`}>
+                    <p className="text-[10px] text-field-muted">
                       {isOwn ? "You" : profile?.username || "..."}
                     </p>
-                    <div className={`max-w-xs px-3 py-2 rounded-2xl text-sm ${
-                      isOwn ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-800"
-                    }`}>
+                    <div
+                      className={`px-3 py-2 rounded-2xl text-sm ${
+                        isOwn
+                          ? "text-field-base rounded-br-sm"
+                          : "bg-white/[0.06] text-field-text rounded-bl-sm"
+                      }`}
+                      style={isOwn ? { background: color } : {}}
+                    >
                       {msg.text}
                     </div>
                   </div>
                 </div>
-              );
+              )
             })}
             <div ref={messagesEndRef} />
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex gap-2 p-4 border-t border-white/[0.06]">
             <input
               value={newMessage}
               onChange={e => setNewMessage(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSendMessage()}
+              onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
               placeholder="Type a message..."
-              className="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="flex-1 h-10 glass rounded-xl px-4 text-sm text-field-text placeholder:text-field-muted outline-none focus:border-field-green/30 border border-white/[0.06] transition-all"
             />
-            <button
+            <Button
               onClick={handleSendMessage}
               disabled={sendingMessage || !newMessage.trim()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              size="icon"
             >
-              {sendingMessage ? <ClipLoader size={14} color="#fff" /> : "Send"}
-            </button>
+              <Send size={15} />
+            </Button>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
-  );
+  )
 }
