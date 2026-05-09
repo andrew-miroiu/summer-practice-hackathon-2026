@@ -45,18 +45,26 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public ProfilePageDTO getProfileById(UUID id) {
-        List<Object[]> result = profileRepository.findProfileWithFollowersAndFollowing(id);
-        if (result.isEmpty()) {
+        Profile profile = profileRepository.findProfileById(id);
+
+        if (profile == null) {
             throw new NoSuchElementException("Profile not found");
         }
-        Object[] profile = result.get(0);
+
+        long followers = profileRepository.countFollowers(id);
+        long following = profileRepository.countFollowing(id);
+
         return new ProfilePageDTO(
-                (UUID) profile[0],
-                (String) profile[1],
-                (String) profile[2],
-                (LocalDateTime) profile[3],
-                String.valueOf(((Number) profile[4]).longValue()),
-                String.valueOf(((Number) profile[5]).longValue())
+                profile.getId(),
+                profile.getUsername(),
+                profile.getAvatarUrl(),
+                profile.getCreatedAt(),
+                String.valueOf(followers),
+                String.valueOf(following),
+                profile.getDescription(),
+                profile.getSkillLevel(),
+                profile.getAvailableToday(),
+                profile.getSportsPreferences()
         );
     }
 

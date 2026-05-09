@@ -4,9 +4,11 @@ import Login from "./pages/Login"
 import Signup from "./pages/Signup"
 import Navbar from "./components/Navbar"
 import Feed from "./pages/Feed"
-import Messages from "./pages/Messages"
 import Search from "./pages/Search"
 import Profile from "./pages/Profile"
+import Matching from "./pages/Matching"
+import EventDetail from "./pages/EventDetail"
+import CreateEvent from "./pages/CreateEvent"
 import type { User } from "@supabase/supabase-js"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 
@@ -19,26 +21,24 @@ function App() {
     const handleOAuthCallback = async () => {
       if (window.location.hash.includes("access_token")) {
         const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
-
         if (!error) {
           window.history.replaceState({}, "", window.location.pathname)
         }
       }
     }
-
     const loadUser = async () => {
       await handleOAuthCallback()
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
       setLoading(false)
     }
-
     loadUser()
   }, [])
 
   if (loading) return <p>Loading...</p>
+
   if (!user) return (
-    login ? <Login setLogin={setLogin}/> : <Signup setLogin={setLogin}/>
+    login ? <Login setLogin={setLogin} /> : <Signup setLogin={setLogin} />
   )
 
   function handleLogout() {
@@ -51,10 +51,12 @@ function App() {
     <BrowserRouter>
       <Navbar handleLogout={handleLogout} userId={user.id} />
       <Routes>
-        <Route path="/" element={<Feed currentUserId={user.id} />} />
-        <Route path="/messages" element={<Messages currentUserId={user.id} />} />
+        <Route path="/" element={<Feed />} />
         <Route path="/search" element={<Search currentUserId={user.id} />} />
         <Route path="/profile/:id" element={<Profile key={user.id} currentUser={user.id} />} />
+        <Route path="/matching" element={<Matching />} />
+        <Route path="/events/:id" element={<EventDetail currentUserId={user.id} />} />
+        <Route path="/events/create" element={<CreateEvent />} />
       </Routes>
     </BrowserRouter>
   )

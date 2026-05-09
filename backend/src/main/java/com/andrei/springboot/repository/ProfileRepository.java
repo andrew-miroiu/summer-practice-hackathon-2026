@@ -53,4 +53,10 @@ public interface ProfileRepository extends JpaRepository<Profile, UUID> {
         WHERE p.id = :userId
     """)
     List<Object[]> findProfileWithFollowersAndFollowing(@Param("userId") UUID userId);
+
+    @Query("SELECT COUNT(f) FROM Follow f WHERE CAST(f.followingId AS uuid) = :userId")
+    long countFollowers(@Param("userId") UUID userId);
+
+    @Query("SELECT COUNT(f) FROM Follow f WHERE CAST(f.followerId AS uuid) = :userId")
+    long countFollowing(@Param("userId") UUID userId);
 }
