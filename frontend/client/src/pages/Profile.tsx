@@ -58,6 +58,44 @@ export default function Profile({ currentUser }: ProfileProps) {
   const navigate = useNavigate();
   const isOwner = currentUser === id;
 
+  const [detectingSports, setDetectingSports] = useState(false);
+
+async function handleDetectSports() {
+  if (!description.trim()) {
+    alert("Write a description first!");
+    return;
+  }
+  setDetectingSports(true);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Based on this person's description, identify which sports from this list they might enjoy: Football, Basketball, Tennis, Volleyball, Running, Cycling, Swimming, Badminton. Description: "${description}". Reply ONLY with a JSON array of sport names from the list, nothing else. Example: ["Football", "Running"]`
+            }]
+          }]
+        })
+      }
+    );
+    const data = await res.json();
+    const text = data.candidates[0].content.parts[0].text;
+    const cleaned = text.replace(/```json|```/g, "").trim();
+    const detected: string[] = JSON.parse(cleaned);
+    const valid = detected.filter(s => 
+      ["Football", "Basketball", "Tennis", "Volleyball", "Running", "Cycling", "Swimming", "Badminton"].includes(s)
+    );
+    setSelectedSports(prev => [...new Set([...prev, ...valid])]);
+    alert(`Detected: ${valid.join(", ")}`);
+  } catch (e) {
+    alert("Could not detect sports, try again.");
+  }
+  setDetectingSports(false);
+}
+
   useEffect(() => {
     async function loadProfile() {
       if (!id) return;
@@ -294,6 +332,14 @@ export default function Profile({ currentUser }: ProfileProps) {
                   rows={3}
                 />
               </div>
+
+              <button
+                onClick={handleDetectSports}
+                disabled={detectingSports || !description.trim()}
+                className="w-full py-2 bg-purple-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {detectingSports ? <ClipLoader size={14} color="#fff" /> : "✨ Detect Sports from Description"}
+              </button>
 
               <button
                 onClick={handleSaveProfile}
